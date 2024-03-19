@@ -1,6 +1,11 @@
 <?php
 
 use App\Http\Controllers\BarangController;
+use App\Http\Controllers\ProtectedBarangController;
+use App\Http\Middleware\VerifyCsrfToken;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,3 +51,32 @@ Route::middleware('auth')->group(function() {
 
     });
 });
+
+// NOTE: endpoint untuk mengenerate token (menggunakan user dan password)
+Route::post('/token', function(Request $request) {
+    $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+    if (!Auth::attempt($credentials)) {
+        abort(403);
+    }
+
+    // create token
+    $user = User::where('email', $request->input('email'))->first();
+    $token = $user->createToken($request->input('client_device'))->plainTextToken;
+
+    return ['token' => $token];
+})->withoutMiddleware(VerifyCsrfToken::class);
+
+
+Route::middleware('auth:sanctum')->group(function() {
+    Route::prefix('/protected')->name('protected.')->group(function() {
+        Route::controller(ProtectedBarangController::class)->prefix('/barang')
+                                                           ->name('barang.')->group(function() {
+            Route::get('/', 'index')->name('index');
+                                                           });
+    });
+});
+
+
